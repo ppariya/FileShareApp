@@ -22,7 +22,7 @@ function App() {
   const [refresh, setRefresh] = useState(false);
   const [currentFolder, setCurrentFolder] = useState('');
 
-  useEffect(() => {
+  const fetchFiles = () => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (currentFolder) params.set('folder', currentFolder);
@@ -36,7 +36,21 @@ function App() {
         console.error('Failed to fetch files:', err);
         setFileData({ items: [], currentFolder: '', parentFolder: null });
       });
+  };
+
+  // Fetch files when dependencies change
+  useEffect(() => {
+    fetchFiles();
   }, [search, refresh, currentFolder]);
+
+  // Polling effect - fetch files every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchFiles();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [search, currentFolder]);
 
   const navigateToFolder = (folderName: string) => {
     const newPath = currentFolder ? `${currentFolder}/${folderName}` : folderName;
