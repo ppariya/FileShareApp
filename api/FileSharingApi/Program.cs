@@ -7,7 +7,7 @@ namespace FileSharingApi
 	{
 		public static void Main(string[] args)
 		{
-			var builder = WebApplication.CreateBuilder(args);
+			WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 			
 			// Allow up to 100MB uploads
 			builder.WebHost.ConfigureKestrel(options =>
@@ -37,7 +37,7 @@ namespace FileSharingApi
 				});
 			});
 
-			var app = builder.Build();
+			WebApplication app = builder.Build();
 
 			// Configure Swagger middleware (only in development)
 			if (app.Environment.IsDevelopment())

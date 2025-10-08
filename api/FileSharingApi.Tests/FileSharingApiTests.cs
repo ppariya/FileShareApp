@@ -13,6 +13,8 @@ using Xunit;
 
 namespace FileSharingApi.Tests;
 
+public record FolderRequest(string name, string? parentFolder);
+
 public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileSharingApi.Program>>
 {
 
@@ -26,7 +28,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
             builder.ConfigureAppConfiguration((context, config) =>
             {
                 // Optionally override storage path for isolation
-                var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+                string tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                 Directory.CreateDirectory(tempDir);
                 config.AddInMemoryCollection(new[] { new KeyValuePair<string, string?>("StoragePath", tempDir) });
             });
@@ -87,8 +89,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         HttpResponseMessage listResponse = await _client.GetAsync("/files", TestContext.Current.CancellationToken);
         JsonElement listJson = await listResponse.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
                              .Select(item => item.GetProperty("name").GetString())
                              .ToList();
         
@@ -217,8 +219,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         response.EnsureSuccessStatusCode();
         JsonElement json = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(json.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
                              .Select(item => item.GetProperty("name").GetString())
                              .ToList();
         
@@ -246,8 +248,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         response.EnsureSuccessStatusCode();
         JsonElement json = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(json.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
                              .Select(item => item.GetProperty("name").GetString())
                              .ToList();
         
@@ -259,7 +261,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task ListFiles_SearchRecursive_ReturnsFilesFromSubfolders()
     {
         // Arrange: create folder and upload files in different locations
-        var folderRequest = new { name = "searchtest", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("searchtest", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
         
         // Upload file in root
@@ -285,8 +287,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         response.EnsureSuccessStatusCode();
         JsonElement json = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(json.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
                              .Select(item => item.GetProperty("name").GetString())
                              .ToList();
         
@@ -313,8 +315,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         HttpResponseMessage listResp = await _client.GetAsync("/files", TestContext.Current.CancellationToken);
         JsonElement listJson = await listResp.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> fileNames = items.Where(item => item.GetProperty("type").GetString() == "file")
                              .Select(item => item.GetProperty("name").GetString())
                              .ToList();
         Assert.DoesNotContain(fileName, fileNames);
@@ -339,7 +341,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task CreateFolder_ValidName_ReturnsOk()
     {
         // Arrange
-        var request = new { name = "testfolder", parentFolder = (string?)null };
+        FolderRequest request = new FolderRequest("testfolder", null);
 
         // Act
         HttpResponseMessage response = await _client.PostAsJsonAsync("/files/folder", request, TestContext.Current.CancellationToken);
@@ -355,7 +357,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task CreateFolder_InvalidName_ReturnsBadRequest()
     {
         // Arrange
-        var request = new { name = "../invalidfolder", parentFolder = (string?)null };
+        FolderRequest request = new FolderRequest("../invalidfolder", null);
 
         // Act
         HttpResponseMessage response = await _client.PostAsJsonAsync("/files/folder", request, TestContext.Current.CancellationToken);
@@ -370,7 +372,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task CreateFolder_EmptyName_ReturnsBadRequest()
     {
         // Arrange
-        var request = new { name = "", parentFolder = (string?)null };
+        FolderRequest request = new FolderRequest("", null);
 
         // Act
         HttpResponseMessage response = await _client.PostAsJsonAsync("/files/folder", request, TestContext.Current.CancellationToken);
@@ -386,7 +388,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     {
         // Arrange
         string longName = new string('a', 256);
-        var request = new { name = longName, parentFolder = (string?)null };
+        FolderRequest request = new FolderRequest(longName, null);
 
         // Act
         HttpResponseMessage response = await _client.PostAsJsonAsync("/files/folder", request, TestContext.Current.CancellationToken);
@@ -401,7 +403,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task CreateFolder_DuplicateName_ReturnsConflict()
     {
         // Arrange
-        var request = new { name = "duplicate", parentFolder = (string?)null };
+        FolderRequest request = new FolderRequest("duplicate", null);
         await _client.PostAsJsonAsync("/files/folder", request, TestContext.Current.CancellationToken);
 
         // Act - try to create same folder again
@@ -417,10 +419,10 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task CreateFolder_InParentFolder_ReturnsOk()
     {
         // Arrange
-        var parentRequest = new { name = "parent", parentFolder = (string?)null };
+        FolderRequest parentRequest = new FolderRequest("parent", null);
         await _client.PostAsJsonAsync("/files/folder", parentRequest, TestContext.Current.CancellationToken);
         
-        var childRequest = new { name = "child", parentFolder = "parent" };
+        FolderRequest childRequest = new FolderRequest("child", "parent");
 
         // Act
         HttpResponseMessage response = await _client.PostAsJsonAsync("/files/folder", childRequest, TestContext.Current.CancellationToken);
@@ -436,7 +438,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task CreateFolder_InvalidParentFolder_ReturnsBadRequest()
     {
         // Arrange
-        var request = new { name = "validname", parentFolder = "../invalid" };
+        FolderRequest request = new FolderRequest("validname", "../invalid");
 
         // Act
         HttpResponseMessage response = await _client.PostAsJsonAsync("/files/folder", request, TestContext.Current.CancellationToken);
@@ -451,7 +453,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task DeleteFolder_ExistingFolder_ReturnsNoContent()
     {
         // Arrange
-        var request = new { name = "todelete", parentFolder = (string?)null };
+        FolderRequest request = new FolderRequest("todelete", null);
         await _client.PostAsJsonAsync("/files/folder", request, TestContext.Current.CancellationToken);
 
         // Act
@@ -464,8 +466,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         HttpResponseMessage listResp = await _client.GetAsync("/files", TestContext.Current.CancellationToken);
         JsonElement listJson = await listResp.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
                                .Select(item => item.GetProperty("name").GetString())
                                .ToList();
         Assert.DoesNotContain("todelete", folderNames);
@@ -506,10 +508,10 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task DeleteFolder_WithSubfolders_ReturnsBadRequestWhenNotForced()
     {
         // Arrange - create parent/child structure
-        var parentRequest = new { name = "parent", parentFolder = (string?)null };
+        FolderRequest parentRequest = new FolderRequest("parent", null);
         await _client.PostAsJsonAsync("/files/folder", parentRequest, TestContext.Current.CancellationToken);
         
-        var childRequest = new { name = "child", parentFolder = "parent" };
+        FolderRequest childRequest = new FolderRequest("child", "parent");
         await _client.PostAsJsonAsync("/files/folder", childRequest, TestContext.Current.CancellationToken);
 
         // Act - try to delete parent without force
@@ -530,10 +532,10 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task DeleteFolder_WithSubfolders_DeletesRecursivelyWhenForced()
     {
         // Arrange - create parent/child structure
-        var parentRequest = new { name = "parentforce", parentFolder = (string?)null };
+        FolderRequest parentRequest = new FolderRequest("parentforce", null);
         await _client.PostAsJsonAsync("/files/folder", parentRequest, TestContext.Current.CancellationToken);
         
-        var childRequest = new { name = "child", parentFolder = "parentforce" };
+        FolderRequest childRequest = new FolderRequest("child", "parentforce");
         await _client.PostAsJsonAsync("/files/folder", childRequest, TestContext.Current.CancellationToken);
 
         // Act - delete parent with force (should delete child too)
@@ -546,8 +548,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         HttpResponseMessage listResp = await _client.GetAsync("/files", TestContext.Current.CancellationToken);
         JsonElement listJson = await listResp.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
                                .Select(item => item.GetProperty("name").GetString())
                                .ToList();
         Assert.DoesNotContain("parentforce", folderNames);
@@ -557,7 +559,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task DeleteFolder_WithFiles_ReturnsBadRequestWhenNotForced()
     {
         // Arrange - create folder and add file to it
-        var folderRequest = new { name = "folderwithfiles", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("folderwithfiles", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
         
         // Upload file to the folder
@@ -584,7 +586,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task DeleteFolder_WithFiles_DeletesEverythingWhenForced()
     {
         // Arrange - create folder and add file to it
-        var folderRequest = new { name = "folderwithfilesforce", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("folderwithfilesforce", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
         
         // Upload file to the folder
@@ -603,8 +605,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         HttpResponseMessage listResp = await _client.GetAsync("/files", TestContext.Current.CancellationToken);
         JsonElement listJson = await listResp.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
                                .Select(item => item.GetProperty("name").GetString())
                                .ToList();
         Assert.DoesNotContain("folderwithfilesforce", folderNames);
@@ -614,7 +616,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task DeleteFolder_EmptyFolder_DeletesWithoutForce()
     {
         // Arrange - create empty folder
-        var folderRequest = new { name = "emptyfolder", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("emptyfolder", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
 
         // Act - delete empty folder without force
@@ -627,8 +629,8 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         HttpResponseMessage listResp = await _client.GetAsync("/files", TestContext.Current.CancellationToken);
         JsonElement listJson = await listResp.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
-        var folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
+        List<string?> folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
                                .Select(item => item.GetProperty("name").GetString())
                                .ToList();
         Assert.DoesNotContain("emptyfolder", folderNames);
@@ -638,7 +640,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task ListFiles_WithFolders_ReturnsCorrectTypes()
     {
         // Arrange - create folder and file
-        var folderRequest = new { name = "testfolder", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("testfolder", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
         
         MultipartFormDataContent form = new MultipartFormDataContent();
@@ -652,15 +654,15 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         response.EnsureSuccessStatusCode();
         JsonElement json = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(json.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
         
         Assert.Equal(2, items.Count);
         
-        var folder = items.FirstOrDefault(item => item.GetProperty("name").GetString() == "testfolder");
+        JsonElement folder = items.FirstOrDefault(item => item.GetProperty("name").GetString() == "testfolder");
         Assert.True(folder.ValueKind != JsonValueKind.Undefined);
         Assert.Equal("folder", folder.GetProperty("type").GetString());
         
-        var file = items.FirstOrDefault(item => item.GetProperty("name").GetString() == "test.txt");
+        JsonElement file = items.FirstOrDefault(item => item.GetProperty("name").GetString() == "test.txt");
         Assert.True(file.ValueKind != JsonValueKind.Undefined);
         Assert.Equal("file", file.GetProperty("type").GetString());
         Assert.True(file.GetProperty("size").GetInt64() > 0);
@@ -670,7 +672,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task ListFiles_InFolder_ReturnsCorrectItems()
     {
         // Arrange - create folder and add files
-        var folderRequest = new { name = "listtest", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("listtest", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
         
         // Add file to folder
@@ -691,7 +693,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         response.EnsureSuccessStatusCode();
         JsonElement json = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(json.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
         
         Assert.Single(items);
         Assert.Equal("inFolder.txt", items[0].GetProperty("name").GetString());
@@ -706,7 +708,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task UploadFile_ToFolder_WorksCorrectly()
     {
         // Arrange - create folder
-        var folderRequest = new { name = "uploadtest", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("uploadtest", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
 
         // Act - upload file to folder
@@ -727,7 +729,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         HttpResponseMessage listResponse = await _client.GetAsync("/files?folder=uploadtest", TestContext.Current.CancellationToken);
         JsonElement listJson = await listResponse.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
         
         Assert.Single(items);
         Assert.Equal("folderfile.txt", items[0].GetProperty("name").GetString());
@@ -737,7 +739,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task DownloadFile_FromFolder_WorksCorrectly()
     {
         // Arrange - create folder and upload file
-        var folderRequest = new { name = "downloadtest", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("downloadtest", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
         
         string content = "download this content";
@@ -759,7 +761,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     public async Task DeleteFile_FromFolder_WorksCorrectly()
     {
         // Arrange - create folder and upload file
-        var folderRequest = new { name = "deletetest", parentFolder = (string?)null };
+        FolderRequest folderRequest = new FolderRequest("deletetest", null);
         await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
         
         MultipartFormDataContent form = new MultipartFormDataContent();
@@ -777,15 +779,15 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         HttpResponseMessage listResponse = await _client.GetAsync("/files?folder=deletetest", TestContext.Current.CancellationToken);
         JsonElement listJson = await listResponse.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
-        var items = itemsElement.EnumerateArray().ToList();
+        List<JsonElement> items = itemsElement.EnumerateArray().ToList();
         Assert.Empty(items); // No files in folder
         
         // But folder should still exist in root
         HttpResponseMessage rootListResponse = await _client.GetAsync("/files", TestContext.Current.CancellationToken);
         JsonElement rootListJson = await rootListResponse.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(rootListJson.TryGetProperty("items", out JsonElement rootItemsElement));
-        var rootItems = rootItemsElement.EnumerateArray().ToList();
-        var folderNames = rootItems.Where(item => item.GetProperty("type").GetString() == "folder")
+        List<JsonElement> rootItems = rootItemsElement.EnumerateArray().ToList();
+        List<string?> folderNames = rootItems.Where(item => item.GetProperty("type").GetString() == "folder")
                                   .Select(item => item.GetProperty("name").GetString())
                                   .ToList();
         Assert.Contains("deletetest", folderNames);

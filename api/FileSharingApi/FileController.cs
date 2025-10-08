@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -54,15 +55,15 @@ namespace FileSharingApi
             const long maxFileSize = 100 * 1024 * 1024; // 100MB
             IFormFile file = form.Files[0];
             string originalName = file.FileName;
-            string? newName = form.TryGetValue("newName", out var newNameVal) ? newNameVal.ToString() : null;
-            string? folderPath = form.TryGetValue("folderPath", out var folderVal) ? folderVal.ToString() : null;
+            string? newName = form.TryGetValue("newName", out StringValues newNameVal) ? newNameVal.ToString() : null;
+            string? folderPath = form.TryGetValue("folderPath", out StringValues folderVal) ? folderVal.ToString() : null;
             string useName = !string.IsNullOrWhiteSpace(newName) ? newName : originalName;
 
-            var nameValidation = ValidateFileName(useName);
+            string? nameValidation = ValidateFileName(useName);
             if (nameValidation != null)
                 return BadRequest(nameValidation);
 
-            var folderValidation = ValidateFolderPath(folderPath);
+            string? folderValidation = ValidateFolderPath(folderPath);
             if (folderValidation != null)
                 return BadRequest(folderValidation);
 
@@ -147,8 +148,8 @@ namespace FileSharingApi
             if (folderPath.Contains("..") || folderPath.StartsWith("/") || folderPath.EndsWith("/"))
                 return "Invalid folder path.";
 
-            var parts = folderPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var part in parts)
+            string[] parts = folderPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            foreach (string part in parts)
             {
                 if (string.IsNullOrWhiteSpace(part) || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                     return "Invalid folder name in path.";
@@ -190,11 +191,11 @@ namespace FileSharingApi
         [HttpGet("download")]
         public IActionResult DownloadFile([FromQuery] string filename, [FromQuery] string? folder)
         {
-            var folderValidation = ValidateFolderPath(folder);
+            string? folderValidation = ValidateFolderPath(folder);
             if (folderValidation != null)
                 return BadRequest(folderValidation);
 
-            var nameValidation = ValidateFileName(filename);
+            string? nameValidation = ValidateFileName(filename);
             if (nameValidation != null)
                 return BadRequest(nameValidation);
 
@@ -218,7 +219,7 @@ namespace FileSharingApi
         [HttpGet]
         public IActionResult ListFiles([FromQuery] string? search, [FromQuery] string? folder)
         {
-            var folderValidation = ValidateFolderPath(folder);
+            string? folderValidation = ValidateFolderPath(folder);
             if (folderValidation != null)
                 return BadRequest(folderValidation);
 
@@ -243,7 +244,7 @@ namespace FileSharingApi
                 foreach (string dir in Directory.GetDirectories(targetDirectory))
                 {
                     string name = Path.GetFileName(dir);
-                    var dirInfo = new DirectoryInfo(dir);
+                    DirectoryInfo dirInfo = new DirectoryInfo(dir);
                     items.Add(new FileItem
                     {
                         Name = name,
@@ -257,7 +258,7 @@ namespace FileSharingApi
                 foreach (string file in Directory.GetFiles(targetDirectory))
                 {
                     string name = Path.GetFileName(file);
-                    var fileInfo = new FileInfo(file);
+                    FileInfo fileInfo = new FileInfo(file);
                     items.Add(new FileItem
                     {
                         Name = name,
@@ -269,7 +270,7 @@ namespace FileSharingApi
             }
 
             // Sort: folders first, then files, both alphabetically
-            var sorted = items.OrderBy(i => i.Type == "file" ? 1 : 0).ThenBy(i => i.Name).ToList();
+            List<FileItem> sorted = items.OrderBy(i => i.Type == "file" ? 1 : 0).ThenBy(i => i.Name).ToList();
             
             return Ok(new { 
                 items = sorted,
@@ -283,7 +284,7 @@ namespace FileSharingApi
             if (string.IsNullOrWhiteSpace(currentFolder))
                 return null;
 
-            var parts = currentFolder.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = currentFolder.Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length <= 1)
                 return "";
 
@@ -300,7 +301,7 @@ namespace FileSharingApi
                     string fileName = Path.GetFileName(file);
                     if (fileName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
                     {
-                        var fileInfo = new FileInfo(file);
+                        FileInfo fileInfo = new FileInfo(file);
                         string relativePath = GetRelativePath(file, baseFolderPath);
                         items.Add(new FileItem
                         {
@@ -318,7 +319,7 @@ namespace FileSharingApi
                     string folderName = Path.GetFileName(dir);
                     if (folderName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
                     {
-                        var dirInfo = new DirectoryInfo(dir);
+                        DirectoryInfo dirInfo = new DirectoryInfo(dir);
                         string relativePath = GetRelativePath(dir, baseFolderPath);
                         items.Add(new FileItem
                         {
@@ -356,11 +357,11 @@ namespace FileSharingApi
         [HttpPost("folder")]
         public IActionResult CreateFolder([FromBody] CreateFolderRequest request)
         {
-            var folderValidation = ValidateFolderPath(request.ParentFolder);
+            string? folderValidation = ValidateFolderPath(request.ParentFolder);
             if (folderValidation != null)
                 return BadRequest(folderValidation);
 
-            var nameValidation = ValidateFileName(request.Name);
+            string? nameValidation = ValidateFileName(request.Name);
             if (nameValidation != null)
                 return BadRequest(nameValidation);
 
@@ -393,7 +394,7 @@ namespace FileSharingApi
         [HttpDelete("folder")]
         public IActionResult DeleteFolder([FromQuery] string folder, [FromQuery] bool force = false)
         {
-            var folderValidation = ValidateFolderPath(folder);
+            string? folderValidation = ValidateFolderPath(folder);
             if (folderValidation != null)
                 return BadRequest(folderValidation);
 
@@ -410,8 +411,8 @@ namespace FileSharingApi
                 // Check if folder is empty (unless force delete is requested)
                 if (!force)
                 {
-                    var files = Directory.GetFiles(folderPath);
-                    var subDirectories = Directory.GetDirectories(folderPath);
+                    string[] files = Directory.GetFiles(folderPath);
+                    string[] subDirectories = Directory.GetDirectories(folderPath);
                     
                     if (files.Length > 0 || subDirectories.Length > 0)
                     {
@@ -436,11 +437,11 @@ namespace FileSharingApi
         [HttpDelete("file")]
         public IActionResult DeleteFile([FromQuery] string filename, [FromQuery] string? folder)
         {
-            var folderValidation = ValidateFolderPath(folder);
+            string? folderValidation = ValidateFolderPath(folder);
             if (folderValidation != null)
                 return BadRequest(folderValidation);
 
-            var nameValidation = ValidateFileName(filename);
+            string? nameValidation = ValidateFileName(filename);
             if (nameValidation != null)
                 return BadRequest(nameValidation);
 
