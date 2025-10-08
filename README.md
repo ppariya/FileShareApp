@@ -10,10 +10,6 @@ It's recommended to use the provided Devcontainer for a consistent development e
 ### Using Devcontainer
 1. Ensure Docker is installed and running on your machine.
 1. Open the project folder in VS Code and reopen it in the container when prompted.
-1. (Optional) Update mount configuration in `.devcontainer.json` 
-    - Windows: `source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached`
-    - Mac: `source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached`
-
 
 ### Not using Devcontainer
 1. Ensure .NET (9.0) is installed. You can download it from [here](https://dotnet.microsoft.com/en-us/download/dotnet/9.0).
@@ -50,6 +46,3 @@ It's recommended to use the provided Devcontainer for a consistent development e
 1. Deploy
     - For initial deployment: `./deploy/deploy.sh`
     - To update containers only: `./deploy/deploy.sh --containers-only`
-
-
-    
