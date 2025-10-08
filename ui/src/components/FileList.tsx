@@ -181,8 +181,6 @@ const FileList: React.FC<FileListProps> = ({
   };
 
   const handleDeleteFolder = async (folderName: string) => {
-    if (!window.confirm(`Delete folder "${folderName}" and all its contents?`)) return;
-    
     const params = new URLSearchParams();
     
     if (searchTerm) {
@@ -194,10 +192,36 @@ const FileList: React.FC<FileListProps> = ({
       params.set('folder', folderPath);
     }
     
+    // First attempt to delete without force
     const res = await fetch(`${apiBase}/files/folder?${params.toString()}`, {
       method: 'DELETE',
     });
-    if (res.ok) onDelete();
+    
+    if (res.ok) {
+      onDelete();
+      return;
+    }
+    
+    if (res.status === 400) {
+      const errorData = await res.json();
+      if (errorData.isEmpty === false) {
+        // Folder is not empty, ask for confirmation
+        const filesText = errorData.filesCount > 0 ? `${errorData.filesCount} file(s)` : '';
+        const foldersText = errorData.foldersCount > 0 ? `${errorData.foldersCount} folder(s)` : '';
+        const contentsText = [filesText, foldersText].filter(Boolean).join(' and ');
+        
+        const confirmMessage = `Folder "${folderName}" contains ${contentsText}.\n\nAre you sure you want to delete this folder and all its contents permanently?`;
+        
+        if (window.confirm(confirmMessage)) {
+          // Force delete
+          params.set('force', 'true');
+          const forceRes = await fetch(`${apiBase}/files/folder?${params.toString()}`, {
+            method: 'DELETE',
+          });
+          if (forceRes.ok) onDelete();
+        }
+      }
+    }
   };
 
   const formatFileSize = (bytes: number) => {

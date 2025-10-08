@@ -391,7 +391,7 @@ namespace FileSharingApi
         }
 
         [HttpDelete("folder")]
-        public IActionResult DeleteFolder([FromQuery] string folder)
+        public IActionResult DeleteFolder([FromQuery] string folder, [FromQuery] bool force = false)
         {
             var folderValidation = ValidateFolderPath(folder);
             if (folderValidation != null)
@@ -407,6 +407,23 @@ namespace FileSharingApi
 
             try
             {
+                // Check if folder is empty (unless force delete is requested)
+                if (!force)
+                {
+                    var files = Directory.GetFiles(folderPath);
+                    var subDirectories = Directory.GetDirectories(folderPath);
+                    
+                    if (files.Length > 0 || subDirectories.Length > 0)
+                    {
+                        return BadRequest(new { 
+                            message = "Folder is not empty", 
+                            isEmpty = false,
+                            filesCount = files.Length,
+                            foldersCount = subDirectories.Length
+                        });
+                    }
+                }
+
                 Directory.Delete(folderPath, recursive: true);
                 return NoContent();
             }

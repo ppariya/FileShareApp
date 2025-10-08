@@ -503,7 +503,7 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
     }
 
     [Fact]
-    public async Task DeleteFolder_WithSubfolders_DeletesRecursively()
+    public async Task DeleteFolder_WithSubfolders_ReturnsBadRequestWhenNotForced()
     {
         // Arrange - create parent/child structure
         var parentRequest = new { name = "parent", parentFolder = (string?)null };
@@ -512,8 +512,32 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         var childRequest = new { name = "child", parentFolder = "parent" };
         await _client.PostAsJsonAsync("/files/folder", childRequest, TestContext.Current.CancellationToken);
 
-        // Act - delete parent (should delete child too)
+        // Act - try to delete parent without force
         HttpResponseMessage response = await _client.DeleteAsync("/files/folder?folder=parent", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        
+        // Verify response contains folder info
+        string responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        JsonElement responseJson = JsonSerializer.Deserialize<JsonElement>(responseContent);
+        Assert.False(responseJson.GetProperty("isEmpty").GetBoolean());
+        Assert.Equal(0, responseJson.GetProperty("filesCount").GetInt32());
+        Assert.Equal(1, responseJson.GetProperty("foldersCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task DeleteFolder_WithSubfolders_DeletesRecursivelyWhenForced()
+    {
+        // Arrange - create parent/child structure
+        var parentRequest = new { name = "parentforce", parentFolder = (string?)null };
+        await _client.PostAsJsonAsync("/files/folder", parentRequest, TestContext.Current.CancellationToken);
+        
+        var childRequest = new { name = "child", parentFolder = "parentforce" };
+        await _client.PostAsJsonAsync("/files/folder", childRequest, TestContext.Current.CancellationToken);
+
+        // Act - delete parent with force (should delete child too)
+        HttpResponseMessage response = await _client.DeleteAsync("/files/folder?folder=parentforce&force=true", TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -526,11 +550,11 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         var folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
                                .Select(item => item.GetProperty("name").GetString())
                                .ToList();
-        Assert.DoesNotContain("parent", folderNames);
+        Assert.DoesNotContain("parentforce", folderNames);
     }
 
     [Fact]
-    public async Task DeleteFolder_WithFiles_DeletesEverything()
+    public async Task DeleteFolder_WithFiles_ReturnsBadRequestWhenNotForced()
     {
         // Arrange - create folder and add file to it
         var folderRequest = new { name = "folderwithfiles", parentFolder = (string?)null };
@@ -542,8 +566,35 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         form.Add(new StringContent("folderwithfiles"), "folderPath");
         await _client.PostAsync("/files/upload", form, TestContext.Current.CancellationToken);
 
-        // Act - delete folder
+        // Act - try to delete folder without force
         HttpResponseMessage response = await _client.DeleteAsync("/files/folder?folder=folderwithfiles", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        
+        // Verify response contains folder info
+        string responseContent = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        JsonElement responseJson = JsonSerializer.Deserialize<JsonElement>(responseContent);
+        Assert.False(responseJson.GetProperty("isEmpty").GetBoolean());
+        Assert.Equal(1, responseJson.GetProperty("filesCount").GetInt32());
+        Assert.Equal(0, responseJson.GetProperty("foldersCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task DeleteFolder_WithFiles_DeletesEverythingWhenForced()
+    {
+        // Arrange - create folder and add file to it
+        var folderRequest = new { name = "folderwithfilesforce", parentFolder = (string?)null };
+        await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
+        
+        // Upload file to the folder
+        MultipartFormDataContent form = new MultipartFormDataContent();
+        form.Add(new StringContent("test content"), "file", "test.txt");
+        form.Add(new StringContent("folderwithfilesforce"), "folderPath");
+        await _client.PostAsync("/files/upload", form, TestContext.Current.CancellationToken);
+
+        // Act - delete folder with force
+        HttpResponseMessage response = await _client.DeleteAsync("/files/folder?folder=folderwithfilesforce&force=true", TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -553,7 +604,34 @@ public class FileSharingApiTests : IClassFixture<WebApplicationFactory<FileShari
         JsonElement listJson = await listResp.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
         var items = itemsElement.EnumerateArray().ToList();
-        Assert.Empty(items); // Should be no items left
+        var folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
+                               .Select(item => item.GetProperty("name").GetString())
+                               .ToList();
+        Assert.DoesNotContain("folderwithfilesforce", folderNames);
+    }
+
+    [Fact]
+    public async Task DeleteFolder_EmptyFolder_DeletesWithoutForce()
+    {
+        // Arrange - create empty folder
+        var folderRequest = new { name = "emptyfolder", parentFolder = (string?)null };
+        await _client.PostAsJsonAsync("/files/folder", folderRequest, TestContext.Current.CancellationToken);
+
+        // Act - delete empty folder without force
+        HttpResponseMessage response = await _client.DeleteAsync("/files/folder?folder=emptyfolder", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        
+        // Verify folder is gone
+        HttpResponseMessage listResp = await _client.GetAsync("/files", TestContext.Current.CancellationToken);
+        JsonElement listJson = await listResp.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        Assert.True(listJson.TryGetProperty("items", out JsonElement itemsElement));
+        var items = itemsElement.EnumerateArray().ToList();
+        var folderNames = items.Where(item => item.GetProperty("type").GetString() == "folder")
+                               .Select(item => item.GetProperty("name").GetString())
+                               .ToList();
+        Assert.DoesNotContain("emptyfolder", folderNames);
     }
 
     [Fact]

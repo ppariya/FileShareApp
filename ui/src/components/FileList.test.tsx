@@ -560,15 +560,18 @@ describe('FileList', () => {
       expect(onDelete).not.toHaveBeenCalled();
     });
 
-    it('deletes folder when delete button is clicked and confirmed', async () => {
+    it('deletes empty folder directly', async () => {
       const onDelete = jest.fn();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('')
+      });
+      
       render(<FileList {...defaultProps} onDelete={onDelete} />);
       
       const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
       const folderDeleteButton = deleteButtons[1]; // Second delete button is for the folder
       fireEvent.click(folderDeleteButton);
-      
-      expect(window.confirm).toHaveBeenCalledWith('Delete folder "photos" and all its contents?');
       
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith('/api/files/folder?folder=photos', {
@@ -578,8 +581,83 @@ describe('FileList', () => {
       });
     });
 
+    it('shows confirmation for non-empty folder and force deletes on confirm', async () => {
+      const onDelete = jest.fn();
+      
+      // First call returns 400 (folder not empty)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({
+          isEmpty: false,
+          filesCount: 2,
+          foldersCount: 1
+        })
+      });
+      
+      // Second call (force delete) succeeds
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('')
+      });
+      
+      (window.confirm as jest.Mock).mockReturnValue(true);
+      
+      render(<FileList {...defaultProps} onDelete={onDelete} />);
+      
+      const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+      const folderDeleteButton = deleteButtons[1];
+      fireEvent.click(folderDeleteButton);
+      
+      await waitFor(() => {
+        expect(window.confirm).toHaveBeenCalledWith(
+          'Folder "photos" contains 2 file(s) and 1 folder(s).\n\nAre you sure you want to delete this folder and all its contents permanently?'
+        );
+        expect(mockFetch).toHaveBeenCalledWith('/api/files/folder?folder=photos&force=true', {
+          method: 'DELETE'
+        });
+        expect(onDelete).toHaveBeenCalled();
+      });
+    });
+
+    it('does not delete when user cancels non-empty folder confirmation', async () => {
+      const onDelete = jest.fn();
+      
+      // First call returns 400 (folder not empty)
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({
+          isEmpty: false,
+          filesCount: 1,
+          foldersCount: 0
+        })
+      });
+      
+      (window.confirm as jest.Mock).mockReturnValue(false);
+      
+      render(<FileList {...defaultProps} onDelete={onDelete} />);
+      
+      const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+      const folderDeleteButton = deleteButtons[1];
+      fireEvent.click(folderDeleteButton);
+      
+      await waitFor(() => {
+        expect(window.confirm).toHaveBeenCalledWith(
+          'Folder "photos" contains 1 file(s).\n\nAre you sure you want to delete this folder and all its contents permanently?'
+        );
+        expect(mockFetch).toHaveBeenCalledTimes(1); // Only the first call, no force delete
+        expect(onDelete).not.toHaveBeenCalled();
+      });
+    });
+
     it('deletes folder with full path when in subfolder', async () => {
       const onDelete = jest.fn();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve('')
+      });
+      
       render(<FileList {...defaultProps} currentFolder="documents" onDelete={onDelete} />);
       
       const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
@@ -590,6 +668,7 @@ describe('FileList', () => {
         expect(mockFetch).toHaveBeenCalledWith('/api/files/folder?folder=documents%2Fphotos', {
           method: 'DELETE'
         });
+        expect(onDelete).toHaveBeenCalled();
       });
     });
   });
