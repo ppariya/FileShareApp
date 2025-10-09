@@ -14,7 +14,9 @@ It's recommended to use the provided Devcontainer for a consistent development e
 ### Not using Devcontainer
 1. Ensure .NET (9.0) is installed. You can download it from [here](https://dotnet.microsoft.com/en-us/download/dotnet/9.0).
 2. Ensure Node.js (22.20.0) is installed. You can download it from [here](https://nodejs.org/en/download/).
-3. Run `npm i -g react-scripts`
+3. Ensure Bicep is installed. You can follow the instructions [here](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/install).
+4. Ensure Azure CLI is installed. You can follow the instructions [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest#install).
+5. Run `npm i -g react-scripts`
 
 ## How to Run
 
